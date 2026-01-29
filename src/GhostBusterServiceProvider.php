@@ -23,6 +23,10 @@ class GhostBusterServiceProvider extends ServiceProvider
             ]);
 
             $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+
+            $this->publishes([
+                __DIR__ . '/../config/ghost-buster.php' => config_path('ghost-buster.php'),
+            ], 'ghost-buster-config');
         }
 
         $router->pushMiddlewareToGroup('web', TrackRouteUsage::class);
