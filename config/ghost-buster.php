@@ -9,8 +9,6 @@ return [
     |
     | The driver that Ghost Buster will use to store route usage data.
     |
-    | Supported: "database", "cache"
-    |
     */
 
     'driver' => env('GHOST_BUSTER_DRIVER', 'database'),
@@ -21,9 +19,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | How often cached route usage should be flushed to the database.
-    | This value can be used by your scheduler or sync command.
-    |
-    | Examples: "hourly", "daily", "twiceDaily", "weekly"
+    | This value is used by the scheduler or sync command.
     |
     */
 
@@ -35,14 +31,16 @@ return [
     |--------------------------------------------------------------------------
     |
     | Route names or URIs matching these patterns will not be tracked.
-    | Wildcards (*) are supported.
+    | You can specify whether the pattern applies to the route name or URI.
     |
     */
 
     'ignore_patterns' => [
-        'telescope*',
-        '_debugbar*',
-        'horizon*',
+        'name:telescope*',
+        'name:storage.*',
+        'name:horizon*',
+        'uri:_debugbar*',
+        'uri:up',
     ],
 
 ];

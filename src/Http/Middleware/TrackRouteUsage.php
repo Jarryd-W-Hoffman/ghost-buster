@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
+use Jarryd\GhostBuster\Support\IgnoreMatcher;
 
 class TrackRouteUsage
 {
@@ -21,7 +22,7 @@ class TrackRouteUsage
             $routeName = $route->getName() ?? $route->uri();
             $method = $request->method();
 
-            if ($this->shouldIgnore($routeName)) {
+            if (IgnoreMatcher::shouldIgnore($routeName)) {
                 return $response;
             }
 
@@ -34,19 +35,6 @@ class TrackRouteUsage
         }
 
         return $response;
-    }
-
-    protected function shouldIgnore(string $routeName): bool
-    {
-        $patterns = config('ghost-buster.ignore_patterns', []);
-
-        foreach ($patterns as $pattern) {
-            if (Str::is($pattern, $routeName)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     protected function logToDatabase(string $method, string $routeName): void

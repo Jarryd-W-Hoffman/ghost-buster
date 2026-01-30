@@ -57,8 +57,8 @@ In `config/ghost-buster.php`, you can customize the storage and tracking behavio
 'driver' => env('GHOST_BUSTER_DRIVER', 'database'),
 ```
 
-* **Options:** `database` or `cache`
-* **`database`** – Logs route usage in real-time. Ideal for small to medium apps where simplicity is key.
+* **Supported:** `"database"` or `"cache"`
+* **`database`** – Logs route usage in real-time. Ideal for small to medium apps.
 * **`cache`** – Temporarily stores hits in Redis/Memcached. Best for high-performance apps to minimize database I/O.
 
 ### 2. Sync Frequency (Cache Driver Only)
@@ -68,22 +68,37 @@ In `config/ghost-buster.php`, you can customize the storage and tracking behavio
 ```
 
 * **Purpose:** Determines how often cached route hits are flushed to the database.
-* **Format:** Uses standard [Laravel Scheduler](https://laravel.com/docs/scheduling) syntax (e.g., `hourly`, `daily`, `everyTenMinutes`, `twiceDaily`).
+* **Format:** Must be a valid [`Illuminate\Console\Scheduling\Event`](https://laravel.com/docs/scheduling#schedule-frequency-options) frequency method (e.g., `hourly`, `daily`, `twiceDaily`).
 * **Note:** This setting has no effect if the `database` driver is active.
 
-### 3. Ignore Patterns
+### 3. Ignored Route Patterns
 
 ```php
 'ignore_patterns' => [
-    'telescope*',
-    '_debugbar*',
-    'horizon*',
-    'admin/*',
+    'name:telescope*',
+    'name:storage.*',
+    'name:horizon*',
+    'uri:_debugbar*',
+    'uri:up',
 ],
 ```
 
-* **Purpose:** Exclude specific routes from tracking using wildcards (`*`).
+* **Purpose:** Exclude specific routes from tracking.
+* **Pattern types:**
+
+  * `name:pattern` → matches route names
+  * `uri:pattern` → matches route URIs
+  * `pattern` (no prefix) → matches both name and URI
+* **Wildcards (`*`)** are supported for flexible matching.
 * **Use Case:** Perfect for ignoring internal tools, admin panels, or development utilities that don't represent "real" user traffic.
+
+### Configuration Reference (Quick View)
+
+| Setting           | Description                                             | Allowed Values / Example                                   | Notes                                                                                                             |
+| ----------------- | ------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `driver`          | Storage driver for route usage logs                     | `"database"` (default), `"cache"`                          | `database` logs hits immediately, `cache` temporarily stores hits.                                                |
+| `sync_frequency`  | How often cached route hits are flushed to the database | `"hourly"`, `"daily"`, `"twiceDaily"`, `"everyTenMinutes"` | Only applies if `driver = cache`. Must be a valid Laravel scheduler frequency method.                             |
+| `ignore_patterns` | Routes to exclude from tracking                         | `['name:telescope*', 'uri:test/*', 'storage.local']`       | Supports wildcards (`*`). Typed patterns: `name:` → route name, `uri:` → route URI, unprefixed → auto match both. |
 
 ## Usage
 

@@ -5,6 +5,7 @@ namespace Jarryd\GhostBuster\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
+use Jarryd\GhostBuster\Support\IgnoreMatcher;
 
 class GhostBusterCommand extends Command
 {
@@ -32,12 +33,14 @@ class GhostBusterCommand extends Command
 
         $this->info("Checking for routes unused in the last {$days} days...");
 
-        $allRoutes = collect(Route::getRoutes())->map(function ($route) {
-            return [
-                'name' => $route->getName() ?? $route->uri(),
-                'method' => implode('|', $route->methods()),
-            ];
-        });
+        $allRoutes = collect(Route::getRoutes())
+            ->reject(fn ($route) => IgnoreMatcher::route($route))
+            ->map(function ($route) {
+                return [
+                    'name' => $route->getName() ?? $route->uri(),
+                    'method' => implode('|', $route->methods()),
+                ];
+            });
 
         $usedRoutes = DB::table('route_usage')
             ->where('last_used_at', '>=', $threshold)
@@ -45,7 +48,7 @@ class GhostBusterCommand extends Command
             ->toArray();
 
         $ghosts = $allRoutes->reject(function ($route) use ($usedRoutes) {
-            return in_array($route['name'], $usedRoutes);
+            return in_array($route['name'], $usedRoutes, true);
         });
 
         if ($ghosts->isEmpty()) {
