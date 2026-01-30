@@ -44,13 +44,14 @@ class TrackRouteUsage
             'method' => $method,
         ], [
             'last_used_at' => now(),
-            'updated_at' => now(),
         ]);
     }
 
     protected function logToCache(string $method, string $routeName): void
     {
-        $cacheKey = "ghost_buster:hit:{$method}:{$routeName}";
+        $prefix = config('ghost-buster.cache_prefix', 'ghost_buster:hit:');
+
+        $cacheKey = "{$prefix}{$method}:{$routeName}";
 
         Cache::forever($cacheKey, now()->timestamp);
     }

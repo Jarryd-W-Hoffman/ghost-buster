@@ -29,8 +29,13 @@ class GhostBusterServiceProvider extends ServiceProvider
             ], 'ghost-buster-config');
         }
 
-        $router->pushMiddlewareToGroup('web', TrackRouteUsage::class);
-        $router->pushMiddlewareToGroup('api', TrackRouteUsage::class);
+        $groups = config('ghost-buster.middleware_groups', ['web', 'api']);
+
+        if (is_array($groups)) {
+            foreach ($groups as $group) {
+                $router->pushMiddlewareToGroup($group, TrackRouteUsage::class);
+            }
+        }
 
         if (config('ghost-buster.driver') === 'cache') {
             $callback = function () {

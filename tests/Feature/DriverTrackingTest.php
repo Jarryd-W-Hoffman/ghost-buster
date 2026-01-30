@@ -48,15 +48,25 @@ class DriverTrackingTest extends TestCase
     #[Test]
     public function it_syncs_from_cache_to_database_correctly()
     {
+        config([
+            'ghost-buster.driver' => 'cache',
+            'ghost-buster.cache_prefix' => 'ghost_buster:hit:',
+        ]);
+
         Route::get('/sync-route', function () {
-                return response('OK');
-            })->name('sync.route')->middleware('web');
+            return response('OK');
+        })->name('sync.route')->middleware('web');
 
         $timestamp = now()->timestamp;
-        Cache::forever('ghost_buster:hit:GET:sync.route', $timestamp);
+
+        Cache::forever(
+            'ghost_buster:hit:GET:sync.route',
+            $timestamp
+        );
 
         $this->artisan('ghost:sync')
             ->expectsOutput('Syncing route usage from cache...')
+            ->expectsOutput('Synced 1 route hits to the database.')
             ->assertExitCode(0);
 
         $this->assertDatabaseHas('route_usage', [
@@ -64,6 +74,8 @@ class DriverTrackingTest extends TestCase
             'method' => 'GET',
         ]);
 
-        $this->assertFalse(Cache::has('ghost_buster:hit:GET:sync.route'));
+        $this->assertFalse(
+            Cache::has('ghost_buster:hit:GET:sync.route')
+        );
     }
 }

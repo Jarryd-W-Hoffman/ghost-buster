@@ -40,7 +40,34 @@ return [
         'name:storage.*',
         'name:horizon*',
         'uri:_debugbar*',
-        'uri:up',
+        'uri:/up',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cache Key Prefix
+    |--------------------------------------------------------------------------
+    |
+    | Prefix for storing route hits in your cache.
+    | Useful if multiple apps share the same cache store.
+    |
+    */
+
+    'cache_prefix' => 'ghost_buster:hit:',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Middleware Groups
+    |--------------------------------------------------------------------------
+    |
+    | The middleware groups Ghost Buster should attach to.
+    | By default, both 'web' and 'api' are tracked.
+    |
+    */
+
+    'middleware_groups' => [
+        'web',
+        'api'
     ],
 
 ];

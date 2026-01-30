@@ -13,10 +13,14 @@ return new class extends Migration
     {
         Schema::create('route_usage', function (Blueprint $table) {
             $table->id();
-            $table->string('route_name')->unique();
+            $table->string('route_name');
             $table->string('method');
             $table->timestamp('last_used_at');
-            $table->timestamps();
+
+            $table->unique([
+                'route_name',
+                'method'
+            ]);
         });
     }
 

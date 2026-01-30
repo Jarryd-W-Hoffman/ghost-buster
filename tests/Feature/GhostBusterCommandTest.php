@@ -40,7 +40,7 @@ class GhostBusterCommandTest extends TestCase
         // Manually insert usage for tracked route older than threshold for testing
         DB::table('route_usage')->updateOrInsert(
     ['route_name' => 'tracked.route', 'method' => 'GET'],
-    ['last_used_at' => now()->subDays(31), 'updated_at' => now()]
+    ['last_used_at' => now()->subDays(31)]
 );
 
 
