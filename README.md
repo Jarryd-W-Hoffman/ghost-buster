@@ -168,6 +168,7 @@ CI runs the suite on PHP 8.3, 8.4 and 8.5 against Laravel 12 and 13, and again o
 
 Pull requests are welcome.
 - Work on a feature branch and keep commits small.
+- Sign off every commit (`git commit -s`): the repository checks the [Developer Certificate of Origin](https://developercertificate.org).
 - Each change comes with tests, and `composer test` should pass before you open a PR.
 
 ## License
