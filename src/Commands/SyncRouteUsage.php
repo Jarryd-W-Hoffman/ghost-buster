@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Jarryd\GhostBuster\Support\IgnoreMatcher;
 use Jarryd\GhostBuster\Support\UsageRecorder;
 
@@ -39,7 +40,8 @@ class SyncRouteUsage extends Command
 
         $prefix = config('ghost-buster.cache_prefix', 'ghost_buster:hit:');
         $routes = Route::getRoutes();
-        $syncedCount = 0;
+        $syncedRoutes = 0;
+        $syncedHits = 0;
 
         foreach ($routes as $route) {
             if (IgnoreMatcher::route($route)) {
@@ -56,12 +58,19 @@ class SyncRouteUsage extends Command
                     $hits = (int) Cache::pull("{$prefix}count:{$method}:{$routeName}", 1);
 
                     UsageRecorder::record($method, $routeName, Carbon::createFromTimestamp($timestamp, config('app.timezone')), $hits);
-                    $syncedCount++;
+                    $syncedRoutes++;
+                    $syncedHits += $hits;
                 }
             }
         }
 
-        $this->info("Synced {$syncedCount} route hits to the database.");
+        $this->info(sprintf(
+            'Synced %d %s across %d %s to the database.',
+            $syncedHits,
+            Str::plural('hit', $syncedHits),
+            $syncedRoutes,
+            Str::plural('route', $syncedRoutes),
+        ));
         return Command::SUCCESS;
     }
 }
