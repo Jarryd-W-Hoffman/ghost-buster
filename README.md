@@ -1,176 +1,175 @@
-# 👻 Ghost Buster
+<h1 align="center">👻 Ghost Buster</h1>
 
-### Stop guessing which routes are safe to delete.
+<p align="center">
+    <strong>Find the routes in your Laravel app that nobody uses any more.</strong><br>
+    Ghost Buster quietly records which routes get real traffic, then lists the ones that don't,<br>
+    so you can delete dead code with data instead of guesswork.
+</p>
 
-`Ghost Buster` silently monitors your application's traffic and identifies **"Ghost Routes"**—routes that are defined in your code but haven't been touched by a real user in weeks or months.
+<p align="center">
+    <a href="https://github.com/Jarryd-W-Hoffman/ghost-buster/actions/workflows/tests.yml"><img src="https://github.com/Jarryd-W-Hoffman/ghost-buster/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+    <img src="https://img.shields.io/badge/Laravel-12%20·%2013-ff2d20" alt="Laravel 12 and 13">
+    <img src="https://img.shields.io/badge/PHP-8.3+-777bb4" alt="PHP 8.3 and later">
+    <img src="https://img.shields.io/badge/license-MIT-22c55e" alt="MIT license">
+</p>
+
+<p align="center">
+    <img src=".github/screenshots/ghost-bust.png" alt="php artisan ghost:bust listing seven routes unused in the last 30 days, with their methods, when each was last used and its hit count. Never-used routes are listed first." width="900">
+</p>
+
+<p align="center">
+    <a href="#why-ghost-buster">Why Ghost Buster?</a> ·
+    <a href="#features">Features</a> ·
+    <a href="#installation">Installation</a> ·
+    <a href="#commands">Commands</a> ·
+    <a href="#configuration">Configuration</a> ·
+    <a href="#what-gets-stored">What gets stored</a> ·
+    <a href="#how-its-built">How it's built</a> ·
+    <a href="#development">Development</a> ·
+    <a href="#license">License</a>
+</p>
+
+---
 
 ## Why Ghost Buster?
 
-As Laravel applications grow, they naturally accumulate "Ghost Routes"—deprecated marketing pages, old API versions, or forgotten webhooks. Deleting them usually feels like playing Minesweeper because you lack usage data.
-
-**Ghost Buster is route-agnostic.** Whether you use `routes/web.php`, modular route files, or third-party package routes, it hooks directly into the Laravel Router. If a route is registered in your app, Ghost Buster tracks it.
-
-Ghost Buster gives you the **data-driven confidence** to prune your codebase without the "broken-link" anxiety.
-
-## How It Works
-
-Ghost Buster uses a "Listen, then Compare" approach:
-
-1. **The Tracker:** A lightweight middleware (attached to your `web` and `api` groups by default) logs every successful request (status code below 400). It captures the route name (or URI) and the HTTP method.
-2. **The Comparison:** When you run the `bust` command, the package reflects on your **live application router**. It compares every registered route against the usage data in your storage.
-3. **The Result:** Any route present in your code but missing (or stale) in the usage logs is flagged as a Ghost.
+- **Delete with confidence.** Old marketing pages, retired API versions and forgotten webhooks pile up. Ghost Buster shows which routes haven't been hit in weeks, how long ago they were last used, and how much traffic they ever had.
+- **Every route, wherever it's defined.** It hooks into the router, so `routes/web.php`, modular route files and package routes are all covered.
+- **Out of your users' way.** Hits are recorded after the response has been sent, and busy apps can buffer them in the cache or throttle writes.
+- **Nothing personal.** Only the route, the HTTP method, a timestamp and a hit count are stored. Never payloads, headers, IPs or users.
 
 ## Features
 
-* 🚀 **Universal Tracking:** Monitors routes in your `web` and `api` groups out of the box (custom route files and package routes included), or every route with `track_all_routes`.
-* ⚡ **High Performance:** A single upsert per hit, an optional write throttle, or a Redis-backed cache driver for high-traffic environments.
-* 🔢 **Hit Counts:** Records how often each route is used, so rarely used routes stand out from busy ones.
-* 🛡️ **Smart Ignoring:** Easily exclude internal tools (Telescope, Horizon) or specific URI patterns.
-* 📊 **Zero-Impact:** Tracking happens *after* the response is generated, so your users never feel a delay.
+### 👀 Tracking
+- **Automatic:** a middleware is added to your `web` and `api` groups, with no code changes needed. Turn on `track_all_routes` to track every route instead.
+- **Successful requests only:** responses with a status of 400 or more aren't counted, so failed or rejected requests don't make a route look used.
+- **Per method:** `GET /orders` and `POST /orders` are tracked separately, even when the routes aren't named.
+- **Hit counts:** each route keeps a running total, so a route used three times stands out from one used 400 times.
 
-## Requirements
+### 🔎 Busting
+- **`ghost:bust`** lists every route not used in the last 30 days (or `--days=N`). Routes that have **never** been used come first, then the longest unused.
+- **Last used and hits** for every route listed, so you can tell a forgotten page from a quiet but important one.
+- **One-off exclusions:** `--except` hides more patterns for a single run, without touching your config.
+- **JSON output:** `--json` for scripts, CI checks or `jq`.
+- **Honest about gaps:** routes the tracker never runs on are left out of the report, with a warning, instead of always looking dead.
 
-* PHP 8.3+
-* Laravel 12 or 13
+<p align="center">
+    <img src=".github/screenshots/ghost-bust-except.png" alt="ghost:bust with --except name:webhooks.* and --except uri:api/*: the webhook and API routes are hidden and four ghost routes remain." width="49%">
+    <img src=".github/screenshots/ghost-bust-json.png" alt="ghost:bust --days=90 --json piped into jq, printing one JSON object per ghost route with its name, methods, last used time and hits." width="49%">
+</p>
+
+### ⚡ Busy apps
+- **Cache driver:** record hits in Redis (or any cache store) instead of the database, and flush them in bulk with `ghost:sync`. When the cache driver is on, the sync is scheduled for you, hourly by default.
+- **Write throttle:** with the database driver, `throttle` skips repeat writes for the same route within a window of seconds.
+- **One query per hit:** database writes are a single upsert.
+
+<p align="center">
+    <img src=".github/screenshots/ghost-sync.png" alt="php artisan ghost:sync syncing 127 cached hits across 5 routes to the database, then php artisan schedule:list showing ghost:sync scheduled hourly." width="900">
+</p>
+
+### 🛡️ Ignoring routes
+- **Patterns** match route names (`name:telescope*`), URIs (`uri:admin/*`) or both (`horizon*`), with `*` wildcards.
+- **Sensible defaults:** Telescope, Horizon, Debugbar, Laravel's local file storage routes and the `/up` health check are ignored out of the box.
+- Ignored routes are neither tracked nor reported.
 
 ## Installation
 
-Install the package via Composer:
+### Requirements
+
+- **PHP** 8.3+
+- **Laravel** 12 or 13
+
+### Install
 
 ```bash
 composer require jarryd/ghost-buster
-```
-
-Run the migrations to create the usage table:
-
-```bash
 php artisan migrate
 ```
 
-(Optional) Publish the configuration file:
+That's it: tracking starts with the next request. Let it run for a while (a few weeks of real traffic is a good start), then [bust some ghosts](#commands).
+
+To change the defaults, publish the config file:
 
 ```bash
 php artisan vendor:publish --tag="ghost-buster-config"
 ```
 
+### Upgrading
+
+New versions may add migrations (for example, the `hits` column). Run `php artisan migrate` after updating.
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `php artisan ghost:bust` | List routes not used in the last 30 days |
+| `php artisan ghost:bust --days=90` | Use a different inactivity window (a whole number, 0 or more) |
+| `php artisan ghost:bust --except="name:admin.*"` | Hide more patterns for this run; repeat the option for several |
+| `php artisan ghost:bust --json` | Print the ghosts as JSON: `name`, `methods`, `last_used_at` (ISO 8601 or `null`) and `hits` |
+| `php artisan ghost:sync` | Flush cached hits to the database (cache driver only; scheduled automatically) |
+
 ## Configuration
 
-In `config/ghost-buster.php`, you can customize the storage and tracking behavior.
+All options live in `config/ghost-buster.php`:
 
-### 1. Driver
+| Option | Default | What it does |
+| --- | --- | --- |
+| `driver` | `database` | Where hits go: `database` writes each hit straight away; `cache` buffers them in your cache until `ghost:sync`. Env: `GHOST_BUSTER_DRIVER`. |
+| `sync_frequency` | `hourly` | How often the scheduler runs `ghost:sync` with the cache driver. Any scheduler frequency method, such as `everyTenMinutes` or `daily`. |
+| `ignore_patterns` | Telescope, Horizon, Debugbar, storage, `up` | Routes to neither track nor report. `name:` matches route names, `uri:` matches URIs (leading `/` optional), no prefix matches both. `*` is a wildcard. |
+| `cache_prefix` | `ghost_buster:hit:` | Prefix for cache keys. Change it if several apps share a cache store. |
+| `middleware_groups` | `['web', 'api']` | Groups the tracker is added to. Groups your app doesn't define are skipped. |
+| `track_all_routes` | `false` | Add the tracker as global middleware instead, so every route is tracked. Env: `GHOST_BUSTER_TRACK_ALL_ROUTES`. |
+| `throttle` | `0` (off) | Database driver only: seconds to wait before recording the same route and method again. The check uses your cache, so it only helps when the cache is faster than the database (e.g. Redis). Hit counts then mean "at most one per window". Env: `GHOST_BUSTER_THROTTLE`. |
 
-```php
-'driver' => env('GHOST_BUSTER_DRIVER', 'database'),
-```
+## What gets stored
 
-* **Supported:** `"database"` or `"cache"`
-* **`database`** – Logs route usage in real-time. Ideal for small to medium apps.
-* **`cache`** – Temporarily stores hits in Redis/Memcached. Best for high-performance apps to minimize database I/O.
+One table, `route_usage`, with one row per route and method:
 
-### 2. Sync Frequency (Cache Driver Only)
+| Column | Example | Notes |
+| --- | --- | --- |
+| `route_name` | `blog.show` or `api/v1/reports/legacy` | The route name, or its URI if it has no name |
+| `method` | `GET` | The request's HTTP method |
+| `hits` | `300` | Successful requests recorded |
+| `last_used_at` | `2026-10-29 11:18:39` | The most recent one |
 
-```php
-'sync_frequency' => 'hourly',
-```
+With the cache driver, hits wait in the cache under `{cache_prefix}{method}:{route}` (last used) and `{cache_prefix}count:{method}:{route}` (hits) until `ghost:sync` moves them into the table.
 
-* **Purpose:** Determines how often cached route hits are flushed to the database.
-* **Format:** Must be a valid [`Illuminate\Console\Scheduling\Event`](https://laravel.com/docs/scheduling#schedule-frequency-options) frequency method (e.g., `hourly`, `daily`, `twiceDaily`).
-* **Note:** This setting has no effect if the `database` driver is active.
+## How it's built
 
-### 3. Ignored Route Patterns
+| Part | What it does |
+| --- | --- |
+| `TrackRouteUsage` middleware | A terminable middleware: it records the hit in `terminate()`, after the response has been sent |
+| `UsageRecorder` | One upsert per hit that sets `last_used_at` and adds to `hits`, on SQLite, MySQL and Postgres |
+| `IgnoreMatcher` | Matches routes against `name:` / `uri:` patterns, shared by tracking, syncing and reporting |
+| `ghost:bust` | Compares the live router against `route_usage`, skipping routes the tracker can't see |
+| `ghost:sync` | Moves cached hits into the database, reading and clearing each key in one step so no hits are lost mid-sync |
 
-```php
-'ignore_patterns' => [
-    'name:telescope*',
-    'name:storage.*',
-    'name:horizon*',
-    'uri:_debugbar*',
-    'uri:up',
-],
-```
+The middleware is registered through the HTTP kernel rather than the router. Laravel copies the kernel's middleware groups onto the router whenever they change, which would wipe a router-only registration.
 
-* **Purpose:** Exclude specific routes from tracking.
-* **Pattern types:**
-
-  * `name:pattern` → matches route names
-  * `uri:pattern` → matches route URIs
-  * `pattern` (no prefix) → matches both name and URI
-* **Wildcards (`*`)** are supported for flexible matching.
-* **Use Case:** Perfect for ignoring internal tools, admin panels, or development utilities that don't represent "real" user traffic.
-
-### Configuration Reference (Quick View)
-
-| Setting           | Description                                             | Allowed Values / Example                                   | Notes                                                                                                             |
-| ----------------- | ------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `driver`          | Storage driver for route usage logs                     | `"database"` (default), `"cache"`                          | `database` logs hits immediately, `cache` temporarily stores hits.                                                |
-| `sync_frequency`  | How often cached route hits are flushed to the database | `"hourly"`, `"daily"`, `"twiceDaily"`, `"everyTenMinutes"` | Only applies if `driver = cache`. Must be a valid Laravel scheduler frequency method.                             |
-| `ignore_patterns` | Routes to exclude from tracking                         | `['name:telescope*', 'uri:test/*', 'storage.local']`       | Supports wildcards (`*`). Typed patterns: `name:` → route name, `uri:` → route URI, unprefixed → auto match both. |
-| `cache_prefix`    | Prefix for cache keys holding route hits                | `"ghost_buster:hit:"`                                      | Only applies if `driver = cache`. Change it if several apps share a cache store.                                   |
-| `middleware_groups` | Middleware groups the tracker is attached to          | `['web', 'api']`                                           | Routes outside these groups are not tracked. Groups that don't exist in your app are skipped.                     |
-| `track_all_routes` | Register the tracker as global middleware              | `false` (default), `true`                                  | When `true`, every route is tracked and `middleware_groups` is ignored.                                           |
-| `throttle`        | Seconds to skip repeat writes for the same route/method | `0` (default, off), `60`                                   | Only applies if `driver = database`. Uses a cache flag, so only worth it with a fast cache store (e.g. Redis). Hit counts become "at most one per window". |
-
-## Usage
-
-### 1. Identify Ghost Routes
-
-After letting the package run for a few days, run the `bust` command to see which routes have been inactive:
+## Development
 
 ```bash
-# Find routes untouched for the last 30 days (default)
-php artisan ghost:bust
-
-# Find routes untouched for the last 90 days
-php artisan ghost:bust --days=90
-
-# Ignore extra patterns for this run only (same syntax as ignore_patterns)
-php artisan ghost:bust --except="name:admin.*" --except="uri:webhooks/*"
-
-# Machine-readable output, e.g. for CI or scripts
-php artisan ghost:bust --json
+composer test         # run the test suite
 ```
 
-**Example Output:**
+The suite uses an in-memory SQLite database by default. To run it against MySQL or Postgres, set `DB_CONNECTION` (`mysql` or `pgsql`) with `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD`.
 
-```text
-Checking for routes unused in the last 30 days...
-Found 3 potentially dead routes:
+| Command | What it does |
+| --- | --- |
+| `composer test` | Run every test |
+| `vendor/bin/phpunit --filter=…` | Run some of the tests |
+| `vendor/bin/phpunit --testsuite=Unit` | Run the unit tests only |
+| `DB_CONNECTION=pgsql … composer test` | Run the suite against Postgres (or `mysql`) |
 
-+----------------------+---------+--------------+------+
-| Route Name / URI     | Methods | Last Used    | Hits |
-+----------------------+---------+--------------+------+
-| api/v1/old-endpoint  | GET     | 2 months ago | 412  |
-| temporary-promo-page | GET     | Never        | 0    |
-| user/profile/legacy  | POST    | 5 months ago | 3    |
-+----------------------+---------+--------------+------+
-```
+CI runs the suite on PHP 8.3, 8.4 and 8.5 against Laravel 12 and 13, and again on MySQL 8.4 and Postgres 17.
 
-Routes that the tracking middleware doesn't run on (e.g. outside `middleware_groups`) have no usage data, so they are left out of the report and counted in a warning instead. Enable `track_all_routes` to include them.
+### Contributing
 
-### 2. High-performance Syncing (Cache Driver only)
-
-If you are using the `cache` driver, hits are stored in your cache for speed. You must sync them to the database to view them in the report:
-
-```bash
-php artisan ghost:sync
-```
-
-*Note: Ghost Buster automatically schedules this command to run hourly when the cache driver is active.*
-
-## Security
-
-Ghost Buster only logs the **Route Name/URI**, **Method**, **Timestamp**, and a **hit count**. It never stores request payloads, headers, or PII (Personally Identifiable Information).
-
-## Testing
-
-To run the package's test suite:
-
-```bash
-composer test
-```
-
-The suite uses in-memory SQLite by default. To run it against MySQL or Postgres, set `DB_CONNECTION` (`mysql`/`pgsql`) along with `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD`. CI covers PHP 8.3–8.5 on Laravel 12 and 13, plus MySQL and Postgres.
+Pull requests are welcome.
+- Work on a feature branch and keep commits small.
+- Each change comes with tests, and `composer test` should pass before you open a PR.
 
 ## License
 
-The MIT License (MIT). Please see [License File](LICENSE) for more information.
+Ghost Buster is open-source software licensed under the [MIT license](LICENSE).
