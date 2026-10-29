@@ -146,7 +146,7 @@ class GhostBusterCommandTest extends TestCase
         Route::get('/tracked', fn () => 'OK')->name('tracked.route')->middleware('web');
 
         $this->artisan('ghost:bust')
-            ->expectsOutputToContain('Skipped 1 routes that are not covered by the tracking middleware')
+            ->expectsOutputToContain('Skipped 1 route not covered by the tracking middleware')
             ->expectsOutputToContain('tracked.route')
             ->doesntExpectOutputToContain('untracked.route')
             ->assertExitCode(0);
@@ -168,6 +168,25 @@ class GhostBusterCommandTest extends TestCase
         $this->artisan('ghost:bust')
             ->expectsTable(['Route Name / URI', 'Methods', 'Last Used', 'Hits'], [['no.group.unused', 'GET|HEAD', 'Never', 0]])
             ->assertExitCode(0);
+    }
+
+    #[Test]
+    public function it_lists_never_used_routes_first_then_the_longest_unused()
+    {
+        config(['ghost-buster.ignore_patterns' => ['name:storage.*']]);
+
+        Route::get('/recent', fn () => 'OK')->name('recent')->middleware('web');
+        Route::get('/oldest', fn () => 'OK')->name('oldest')->middleware('web');
+        Route::get('/never', fn () => 'OK')->name('never')->middleware('web');
+
+        DB::table('route_usage')->insert([
+            ['route_name' => 'recent', 'method' => 'GET', 'hits' => 1, 'last_used_at' => now()->subDays(40)],
+            ['route_name' => 'oldest', 'method' => 'GET', 'hits' => 1, 'last_used_at' => now()->subDays(400)],
+        ]);
+
+        Artisan::call('ghost:bust', ['--json' => true]);
+
+        $this->assertSame(['never', 'oldest', 'recent'], array_column(json_decode(Artisan::output(), true), 'name'));
     }
 
     protected function trackAllRoutes($app): void

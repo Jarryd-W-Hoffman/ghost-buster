@@ -8,6 +8,7 @@ use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Jarryd\GhostBuster\Http\Middleware\TrackRouteUsage;
 use Jarryd\GhostBuster\Support\IgnoreMatcher;
 
@@ -79,6 +80,8 @@ class GhostBusterCommand extends Command
                 ];
             })
             ->filter(fn ($route) => $route['last_used_at'] === null || $route['last_used_at']->lt($threshold))
+            // Never-used routes first, then the longest-unused.
+            ->sortBy(fn ($route) => $route['last_used_at']?->getTimestamp() ?? PHP_INT_MIN)
             ->values();
 
         if ($json) {
@@ -93,7 +96,8 @@ class GhostBusterCommand extends Command
         }
 
         if ($untracked->isNotEmpty()) {
-            $this->warn("Skipped {$untracked->count()} routes that are not covered by the tracking middleware (see middleware_groups / track_all_routes).");
+            $count = $untracked->count();
+            $this->warn('Skipped ' . $count . ' ' . Str::plural('route', $count) . ' not covered by the tracking middleware (see middleware_groups / track_all_routes).');
         }
 
         if ($ghosts->isEmpty()) {
