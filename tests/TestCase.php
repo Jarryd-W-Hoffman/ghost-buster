@@ -4,8 +4,6 @@ namespace Jarryd\GhostBuster\Tests;
 
 use Orchestra\Testbench\TestCase as Orchestra;
 use Jarryd\GhostBuster\GhostBusterServiceProvider;
-use Illuminate\Contracts\Http\Kernel;
-use Jarryd\GhostBuster\Http\Middleware\TrackRouteUsage;
 
 class TestCase extends Orchestra
 {
@@ -18,6 +16,14 @@ class TestCase extends Orchestra
     protected function getEnvironmentSetUp($app)
     {
         $app['config']->set('app.key', 'base64:a45mLWt/IxBtjcI9/oSCeIOS/TnAcPYmI/4YdZV1MRE=');
+
+        // Set DB_CONNECTION=mysql|pgsql (plus DB_HOST, DB_DATABASE, ...) to run
+        // the suite against a real server; defaults to in-memory SQLite.
+        if (in_array(env('DB_CONNECTION'), ['mysql', 'mariadb', 'pgsql'], true)) {
+            $app['config']->set('database.default', env('DB_CONNECTION'));
+            return;
+        }
+
         $app['config']->set('database.default', 'testbench');
         $app['config']->set('database.connections.testbench', [
             'driver'   => 'sqlite',
@@ -37,18 +43,5 @@ class TestCase extends Orchestra
         return [
             GhostBusterServiceProvider::class,
         ];
-    }
-
-    /**
-     * Set up the test environment.
-     * @return void
-     */
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->app->make(Kernel::class)->pushMiddleware(
-            TrackRouteUsage::class
-        );
     }
 }

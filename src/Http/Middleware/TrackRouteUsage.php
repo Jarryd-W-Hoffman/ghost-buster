@@ -4,10 +4,9 @@ namespace Jarryd\GhostBuster\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use Jarryd\GhostBuster\Support\IgnoreMatcher;
+use Jarryd\GhostBuster\Support\UsageRecorder;
 
 class TrackRouteUsage
 {
@@ -16,43 +15,56 @@ class TrackRouteUsage
      */
     public function handle(Request $request, Closure $next)
     {
-        $response = $next($request);
+        return $next($request);
+    }
 
-        if ($response->getStatusCode() < 400 && $route = $request->route()) {
-            $routeName = $route->getName() ?? $route->uri();
-            $method = $request->method();
+    /**
+     * Record the hit after the response has been sent to the client.
+     */
+    public function terminate(Request $request, $response): void
+    {
+        $route = $request->route();
 
-            if (IgnoreMatcher::shouldIgnore($routeName)) {
-                return $response;
-            }
-
-            $driver = config('ghost-buster.driver', 'database');
-
-            match ($driver) {
-                'cache' => $this->logToCache($method, $routeName),
-                default => $this->logToDatabase($method, $routeName),
-            };
+        if (! $route || $response->getStatusCode() >= 400 || IgnoreMatcher::route($route)) {
+            return;
         }
 
-        return $response;
+        $routeName = $route->getName() ?? $route->uri();
+        $method = $request->method();
+
+        match (config('ghost-buster.driver', 'database')) {
+            'cache' => $this->logToCache($method, $routeName),
+            default => $this->logToDatabase($method, $routeName),
+        };
     }
 
     protected function logToDatabase(string $method, string $routeName): void
     {
-        DB::table('route_usage')->updateOrInsert([
-            'route_name' => $routeName,
-            'method' => $method,
-        ], [
-            'last_used_at' => now(),
-        ]);
+        $throttle = (int) config('ghost-buster.throttle', 0);
+
+        // Cache::add() only succeeds when the key is absent, so it doubles as the
+        // "recorded recently?" check without a separate read.
+        if ($throttle > 0 && ! Cache::add($this->cacheKey('throttle:', $method, $routeName), true, $throttle)) {
+            return;
+        }
+
+        UsageRecorder::record($method, $routeName, now());
     }
 
     protected function logToCache(string $method, string $routeName): void
     {
+        Cache::forever($this->cacheKey('', $method, $routeName), now()->timestamp);
+
+        // Some stores (database, memcached) won't increment a missing key.
+        $countKey = $this->cacheKey('count:', $method, $routeName);
+        Cache::add($countKey, 0);
+        Cache::increment($countKey);
+    }
+
+    protected function cacheKey(string $type, string $method, string $routeName): string
+    {
         $prefix = config('ghost-buster.cache_prefix', 'ghost_buster:hit:');
 
-        $cacheKey = "{$prefix}{$method}:{$routeName}";
-
-        Cache::forever($cacheKey, now()->timestamp);
+        return "{$prefix}{$type}{$method}:{$routeName}";
     }
 }

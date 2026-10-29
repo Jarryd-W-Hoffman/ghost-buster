@@ -55,4 +55,55 @@ class RouteTrackingTest extends TestCase
             'route_name' => 'ignored.route',
         ]);
     }
+
+    #[Test]
+    public function it_ignores_named_routes_matching_a_uri_pattern()
+    {
+        config(['ghost-buster.ignore_patterns' => ['uri:/health']]);
+
+        Route::get('/health', fn () => 'OK')->name('health.check')->middleware('web');
+
+        $this->get('/health');
+
+        $this->assertDatabaseMissing('route_usage', [
+            'route_name' => 'health.check',
+        ]);
+    }
+
+    #[Test]
+    public function it_loads_default_config_without_publishing()
+    {
+        $this->assertSame('database', config('ghost-buster.driver'));
+        $this->assertContains('name:telescope*', config('ghost-buster.ignore_patterns'));
+    }
+
+    #[Test]
+    public function it_counts_hits()
+    {
+        Route::get('/counted', fn () => 'OK')->name('counted.route')->middleware('web');
+
+        $this->get('/counted');
+        $this->get('/counted');
+        $this->get('/counted');
+
+        $this->assertDatabaseHas('route_usage', ['route_name' => 'counted.route', 'hits' => 3]);
+    }
+
+    #[Test]
+    public function it_throttles_database_writes_when_configured()
+    {
+        config(['ghost-buster.throttle' => 60]);
+
+        Route::get('/throttled', fn () => 'OK')->name('throttled.route')->middleware('web');
+
+        $this->get('/throttled');
+        $this->get('/throttled');
+
+        $this->assertDatabaseHas('route_usage', ['route_name' => 'throttled.route', 'hits' => 1]);
+
+        $this->travel(61)->seconds();
+        $this->get('/throttled');
+
+        $this->assertDatabaseHas('route_usage', ['route_name' => 'throttled.route', 'hits' => 2]);
+    }
 }

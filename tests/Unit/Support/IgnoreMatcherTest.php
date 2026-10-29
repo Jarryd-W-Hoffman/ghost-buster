@@ -47,10 +47,10 @@ class IgnoreMatcherTest extends TestCase
             'storage.local',
         ]]);
 
-        $route1 = new Route(['GET'], '/telescope/dashboard', fn() => null, 'telescope.dashboard');
-        $route2 = new Route(['GET'], '/test/ignore-me', fn() => null, 'test.ignore');
-        $route3 = new Route(['GET'], '/storage/local', fn() => null, 'storage.local');
-        $route4 = new Route(['GET'], '/keep-me', fn() => null, 'keep.route');
+        $route1 = (new Route(['GET'], '/telescope/dashboard', fn() => null))->name('telescope.dashboard');
+        $route2 = (new Route(['GET'], '/test/ignore-me', fn() => null))->name('test.ignore');
+        $route3 = (new Route(['GET'], '/storage/local', fn() => null))->name('storage.local');
+        $route4 = (new Route(['GET'], '/keep-me', fn() => null))->name('keep.route');
 
         $this->assertTrue(IgnoreMatcher::route($route1));
         $this->assertTrue(IgnoreMatcher::route($route2));

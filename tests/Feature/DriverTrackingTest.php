@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class DriverTrackingTest extends TestCase
 {
@@ -77,5 +78,44 @@ class DriverTrackingTest extends TestCase
         $this->assertFalse(
             Cache::has('ghost_buster:hit:GET:sync.route')
         );
+    }
+
+    #[Test]
+    public function it_counts_cached_hits_and_adds_them_on_sync()
+    {
+        config(['ghost-buster.driver' => 'cache']);
+
+        Route::get('/busy', fn () => 'OK')->name('busy.route')->middleware('web');
+
+        DB::table('route_usage')->insert([
+            'route_name' => 'busy.route',
+            'method' => 'GET',
+            'hits' => 10,
+            'last_used_at' => now()->subDay(),
+        ]);
+
+        $this->get('/busy');
+        $this->get('/busy');
+
+        $this->assertSame(2, Cache::get('ghost_buster:hit:count:GET:busy.route'));
+
+        $this->artisan('ghost:sync')->assertExitCode(0);
+
+        $this->assertDatabaseHas('route_usage', ['route_name' => 'busy.route', 'hits' => 12]);
+        $this->assertFalse(Cache::has('ghost_buster:hit:count:GET:busy.route'));
+    }
+
+    #[Test]
+    public function it_syncs_hits_cached_before_counting_existed_as_one()
+    {
+        config(['ghost-buster.driver' => 'cache']);
+
+        Route::get('/legacy', fn () => 'OK')->name('legacy.route')->middleware('web');
+
+        Cache::forever('ghost_buster:hit:GET:legacy.route', now()->timestamp);
+
+        $this->artisan('ghost:sync')->assertExitCode(0);
+
+        $this->assertDatabaseHas('route_usage', ['route_name' => 'legacy.route', 'hits' => 1]);
     }
 }
