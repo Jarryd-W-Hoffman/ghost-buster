@@ -67,7 +67,7 @@ class DriverTrackingTest extends TestCase
 
         $this->artisan('ghost:sync')
             ->expectsOutput('Syncing route usage from cache...')
-            ->expectsOutput('Synced 1 route hits to the database.')
+            ->expectsOutput('Synced 1 hit across 1 route to the database.')
             ->assertExitCode(0);
 
         $this->assertDatabaseHas('route_usage', [
@@ -99,7 +99,9 @@ class DriverTrackingTest extends TestCase
 
         $this->assertSame(2, Cache::get('ghost_buster:hit:count:GET:busy.route'));
 
-        $this->artisan('ghost:sync')->assertExitCode(0);
+        $this->artisan('ghost:sync')
+            ->expectsOutput('Synced 2 hits across 1 route to the database.')
+            ->assertExitCode(0);
 
         $this->assertDatabaseHas('route_usage', ['route_name' => 'busy.route', 'hits' => 12]);
         $this->assertFalse(Cache::has('ghost_buster:hit:count:GET:busy.route'));
