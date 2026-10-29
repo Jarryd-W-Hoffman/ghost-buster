@@ -40,7 +40,7 @@ return [
         'name:storage.*',
         'name:horizon*',
         'uri:_debugbar*',
-        'uri:/up',
+        'uri:up',
     ],
 
     /*
@@ -67,7 +67,36 @@ return [
 
     'middleware_groups' => [
         'web',
-        'api'
+        'api',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Track All Routes
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the tracker is registered as global middleware so every
+    | route is tracked, regardless of its middleware groups. When disabled,
+    | routes outside the groups above are untracked and are left out of the
+    | ghost:bust report, since there is no usage data for them.
+    |
+    */
+
+    'track_all_routes' => env('GHOST_BUSTER_TRACK_ALL_ROUTES', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Write Throttle (Database Driver)
+    |--------------------------------------------------------------------------
+    |
+    | The number of seconds to wait before recording another hit for the same
+    | route and method. A cache flag is used to skip the database write within
+    | this window, so it only helps when your cache store is faster than your
+    | database (e.g. Redis). Hit counts become "at most one per window".
+    | Set to 0 to record every request.
+    |
+    */
+
+    'throttle' => env('GHOST_BUSTER_THROTTLE', 0),
 
 ];

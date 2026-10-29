@@ -4,9 +4,10 @@ namespace Jarryd\GhostBuster\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Jarryd\GhostBuster\Support\IgnoreMatcher;
+use Jarryd\GhostBuster\Support\UsageRecorder;
 
 class SyncRouteUsage extends Command
 {
@@ -41,24 +42,20 @@ class SyncRouteUsage extends Command
         $syncedCount = 0;
 
         foreach ($routes as $route) {
-            $routeName = $route->getName() ?? $route->uri();
-
-            if (IgnoreMatcher::shouldIgnore($routeName)) {
+            if (IgnoreMatcher::route($route)) {
                 continue;
             }
+
+            $routeName = $route->getName() ?? $route->uri();
 
             foreach ($route->methods() as $method) {
                 $cacheKey = "{$prefix}{$method}:{$routeName}";
 
-                if ($timestamp = Cache::get($cacheKey)) {
-                    DB::table('route_usage')->updateOrInsert([
-                        'route_name' => $routeName,
-                        'method' => $method,
-                    ], [
-                        'last_used_at' => date('Y-m-d H:i:s', $timestamp),
-                    ]);
+                // pull() reads and removes in one step so hits recorded mid-sync aren't lost
+                if ($timestamp = Cache::pull($cacheKey)) {
+                    $hits = (int) Cache::pull("{$prefix}count:{$method}:{$routeName}", 1);
 
-                    Cache::forget($cacheKey);
+                    UsageRecorder::record($method, $routeName, Carbon::createFromTimestamp($timestamp, config('app.timezone')), $hits);
                     $syncedCount++;
                 }
             }
