@@ -19,6 +19,7 @@
 
 <p align="center">
     <a href="#why-ghost-buster">Why Ghost Buster?</a> ·
+    <a href="#how-it-works">How it works</a> ·
     <a href="#features">Features</a> ·
     <a href="#installation">Installation</a> ·
     <a href="#commands">Commands</a> ·
@@ -38,6 +39,23 @@
 - **Out of your users' way.** Hits are recorded after the response has been sent, and busy apps can buffer them in the cache or throttle writes.
 - **Nothing personal.** Only the route, the HTTP method, a timestamp and a hit count are stored. Never payloads, headers, IPs or users.
 
+## How it works
+
+Ghost Buster listens first and compares later. A middleware notes each successful request once the response has gone out. Later, `ghost:bust` checks every route your app defines against those notes.
+
+```mermaid
+flowchart LR
+    Visitor["A visitor"] -->|request| App["Your Laravel app"]
+    App -->|response| Visitor
+    App -.->|"after the response<br/>has been sent"| Tracker["Ghost Buster's<br/>tracker"]
+    Tracker -->|"database driver:<br/>one upsert per hit"| Table[("route_usage<br/>table")]
+    Tracker -->|"cache driver"| Cache["Your cache<br/>(e.g. Redis)"]
+    Cache -->|"ghost:sync<br/>(hourly)"| Table
+    Routes["Every route<br/>your app defines"] --> Bust["ghost:bust"]
+    Table --> Bust
+    Bust --> Report["👻 Ghost routes:<br/>never used, or not<br/>used in --days"]
+```
+
 ## Features
 
 ### 👀 Tracking
@@ -53,6 +71,19 @@
 - **JSON output:** `--json` for scripts, CI checks or `jq`.
 - **Honest about gaps:** routes the tracker never runs on are left out of the report, with a warning, instead of always looking dead.
 
+How `ghost:bust` decides what to list:
+
+```mermaid
+flowchart TD
+    Route["Each route in your app"] --> Ignored{"Matches ignore_patterns<br/>or --except?"}
+    Ignored -->|yes| Hidden["Left out"]
+    Ignored -->|no| Tracked{"Does the tracker<br/>run on this route?"}
+    Tracked -->|no| Skipped["Left out, and counted<br/>in a warning"]
+    Tracked -->|yes| Recent{"Any of its methods used<br/>in the last --days days?"}
+    Recent -->|yes| Alive["In use: not listed"]
+    Recent -->|no| Ghost["👻 Listed as a ghost,<br/>with last used and hits"]
+```
+
 <p align="center">
     <img src=".github/screenshots/ghost-bust-except.png" alt="ghost:bust with --except name:webhooks.* and --except uri:api/*: the webhook and API routes are hidden and four ghost routes remain." width="49%">
     <img src=".github/screenshots/ghost-bust-json.png" alt="ghost:bust --days=90 --json piped into jq, printing one JSON object per ghost route with its name, methods, last used time and hits." width="49%">
@@ -62,6 +93,23 @@
 - **Cache driver:** record hits in Redis (or any cache store) instead of the database, and flush them in bulk with `ghost:sync`. When the cache driver is on, the sync is scheduled for you, hourly by default.
 - **Write throttle:** with the database driver, `throttle` skips repeat writes for the same route within a window of seconds.
 - **One query per hit:** database writes are a single upsert.
+
+What happens to each successful request under each driver:
+
+```mermaid
+flowchart LR
+    subgraph database ["database driver (default)"]
+        direction TB
+        D1["Successful request"] --> D2{"throttle on, and this route<br/>recorded in the last N seconds?"}
+        D2 -->|yes| D3["Nothing written"]
+        D2 -->|no| D4["route_usage: last_used_at = now,<br/>hits + 1"]
+    end
+    subgraph cache ["cache driver"]
+        direction TB
+        C1["Successful request"] --> C2["Cache: last used time,<br/>hit count + 1"]
+        C2 -->|"ghost:sync, on your<br/>sync_frequency"| C3["route_usage: last_used_at,<br/>hits + the cached count"]
+    end
+```
 
 <p align="center">
     <img src=".github/screenshots/ghost-sync.png" alt="php artisan ghost:sync syncing 127 cached hits across 5 routes to the database, then php artisan schedule:list showing ghost:sync scheduled hourly." width="900">
